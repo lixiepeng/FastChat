@@ -7,6 +7,7 @@ from fastchat.conversation import conv_templates, SeparatorStyle
 from fastchat.serve.compression import compress_module
 from fastchat.serve.monkey_patch_non_inplace import replace_llama_attn_with_non_inplace_operations
 from fastchat.serve.serve_chatglm import chatglm_generate_stream
+from fastchat.serve.serve_llamacpp import llamacpp_generate_stream
 
 
 def load_model(model_name, device, num_gpus, load_8bit=False, debug=False):
@@ -29,8 +30,12 @@ def load_model(model_name, device, num_gpus, load_8bit=False, debug=False):
         replace_llama_attn_with_non_inplace_operations()
     else:
         raise ValueError(f"Invalid device: {device}")
-
-    if "chatglm" in model_name:
+    
+    if "ggml" in model_name:
+        from pyllamacpp.model import Model
+        tokenizer = None
+        model = Model(ggml_model=model_name, n_ctx=512)
+    elif "chatglm" in model_name:
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         model = AutoModel.from_pretrained(model_name, trust_remote_code=True).half().cuda()
     else:
@@ -134,8 +139,9 @@ def chat_loop(model_name: str, device: str, num_gpus: str, load_8bit: bool,
     # Model
     model, tokenizer = load_model(model_name, device,
         num_gpus, load_8bit, debug)
+    is_llamacpp = "ggml" in model_name
     is_chatglm = "chatglm" in str(type(model)).lower()
-
+    
     # Chat
     conv = conv_templates[conv_template].copy()
     while True:
@@ -150,6 +156,10 @@ def chat_loop(model_name: str, device: str, num_gpus: str, load_8bit: bool,
         conv.append_message(conv.roles[0], inp)
         conv.append_message(conv.roles[1], None)
 
+        if is_llamacpp:
+            generate_stream_func = llamacpp_generate_stream
+            prompt = conv.get_prompt()
+            skip_echo_len = len(conv.messages[-2][1]) + 1
         if is_chatglm:
             prompt = conv.messages[conv.offset:]
             generate_stream_func = chatglm_generate_stream

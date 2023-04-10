@@ -21,6 +21,7 @@ import uvicorn
 from fastchat.constants import WORKER_HEART_BEAT_INTERVAL
 from fastchat.serve.inference import load_model, generate_stream
 from fastchat.serve.serve_chatglm import chatglm_generate_stream
+from fastchat.serve.serve_llamacpp import llamacpp_generate_stream
 from fastchat.utils import (build_logger, server_error_msg,
     pretty_print_semaphore)
 
@@ -63,8 +64,11 @@ class ModelWorker:
         else:
             self.context_len = 2048
 
+        is_llamacpp = "ggml" in model_name
         is_chatglm = "chatglm" in str(type(self.model)).lower()
-        if is_chatglm:
+        if is_llamacpp:
+            self.generate_stream_func = llamacpp_generate_stream
+        elif is_chatglm:
             self.generate_stream_func = chatglm_generate_stream
         else:
             self.generate_stream_func = generate_stream
