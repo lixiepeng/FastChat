@@ -156,11 +156,6 @@ def chat_loop(model_name: str, device: str, num_gpus: str, load_8bit: bool,
         conv.append_message(conv.roles[0], inp)
         conv.append_message(conv.roles[1], None)
 
-        if is_llamacpp:
-            print("llamacpp...")
-            generate_stream_func = llamacpp_generate_stream
-            prompt = conv.get_prompt()
-            skip_echo_len = len(conv.messages[-2][1]) + 1
         if is_chatglm:
             prompt = conv.messages[conv.offset:]
             generate_stream_func = chatglm_generate_stream
@@ -169,6 +164,9 @@ def chat_loop(model_name: str, device: str, num_gpus: str, load_8bit: bool,
             generate_stream_func = generate_stream
             prompt = conv.get_prompt()
             skip_echo_len = len(prompt) + 1
+        if is_llamacpp:
+            print("llamacpp...")
+            generate_stream_func = llamacpp_generate_stream
 
         params = {
             "model": model_name,
